@@ -11,7 +11,7 @@ crontab -e
 crontab -l
 ```
 
-自定义 curl 命令需要修改这段：curl 需要 -I 参数来识别httpcode判断是否200（成功）
+自定义 curl ：curl 需要在前面增加 -i 参数来识别httpcode判断是否200（成功）
 ![alt text](image/readme/image.png)
 
 程序还提供了一个 index.html ，导入 logl.txt 可以方便的可视化分析日志内容。
