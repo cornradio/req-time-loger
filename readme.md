@@ -18,8 +18,8 @@ log 兼容 html 分析页面。
 
 
 ## curl命令的要求
-自定义 curl ：curl 需要在前面增加 -i 参数来识别httpcode判断是否200（成功）
-![alt text](image/readme/image.png)
+自定义 curl ：curl 需要在前面增加 `-i` 参数来识别httpcode判断是否200（成功）
+
 
 ## html分析页面
 程序提供了一个 index.html ，导入 logl.txt 可以方便的可视化分析日志内容。
