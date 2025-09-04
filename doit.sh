@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # 这里是 curl 命令占位符（支持多行，直接粘贴到两个 EOF 之间）
 CMD_STR=$(cat <<'EOF'
-curl -I 'https://b.cornradio.org/' \
-  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
-  -H 'accept-language: zh-CN,zh;q=0.9,en;q=0.8' \
-  -H 'cache-control: max-age=0' \
-  -H 'priority: u=0, i' \
+curl -i 'https://xxxx.com/' \
+  -d 'cookie1:aaa; cookie2:bbb; \
   -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
 EOF
 )

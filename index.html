@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>请求耗时分析图表</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             min-height: 100vh;
         }
         
@@ -18,13 +20,13 @@
             max-width: 1200px;
             margin: 0 auto;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             overflow: hidden;
         }
         
         .header {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -63,20 +65,21 @@
         }
         
         .file-input-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
             color: white;
             padding: 15px 30px;
-            border-radius: 50px;
+            border-radius: 6px;
             border: none;
             font-size: 1.1em;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
         }
         
         .file-input-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.25);
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
         }
         
         .file-name {
@@ -103,12 +106,12 @@
         }
         
         .stat-card {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
             color: white;
             padding: 20px;
-            border-radius: 10px;
+            border-radius: 6px;
             text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
         }
         
         .stat-value {
@@ -147,13 +150,29 @@
         </div>
         
         <div class="upload-section">
-            <div class="file-input-wrapper">
-                <input type="file" id="fileInput" class="file-input" accept=".txt" />
-                <button class="file-input-button" onclick="document.getElementById('fileInput').click()">
-                    📁 选择 log.txt 文件
-                </button>
+            <div style="margin-bottom: 20px;">
+                <div style="display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;">
+                    <input type="url" id="urlInput" placeholder="输入txt文件URL，例如: https://example.com/log.txt" 
+                           style="padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; width: 400px; font-size: 14px;">
+                    <button id="downloadBtn" class="file-input-button" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);">
+                        🌐 从URL下载
+                    </button>
+                </div>
+                <div id="downloadStatus" style="margin-top: 8px; font-size: 12px; color: #666;"></div>
+                <div style="margin-top: 8px; font-size: 11px; color: #888; text-align: center;">
+                    <small>💡 提示：如果URL下载失败，系统会自动尝试多个代理服务，或提供手动输入选项</small>
+                </div>
             </div>
-            <div id="fileName" class="file-name"></div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" class="file-input" accept=".txt" />
+                    <button class="file-input-button" onclick="document.getElementById('fileInput').click()">
+                        📁 选择 log.txt 文件
+                    </button>
+                </div>
+                <div id="fileName" class="file-name"></div>
+            </div>
         </div>
         
         <div class="chart-section">
@@ -181,16 +200,39 @@
             </div>
             
             <div id="controls" style="text-align: center; margin: 20px 0; display: none;">
-                <div style="display:inline-flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center;">
+                <div style="display:inline-flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; margin-bottom: 15px;">
                     <label>最小(ms)
                         <input id="minMs" type="number" min="0" placeholder="例如 0" style="padding:10px 12px; border:1px solid #ddd; border-radius:8px; width:140px;">
                     </label>
                     <label>最大(ms)
                         <input id="maxMs" type="number" min="0" placeholder="例如 5000" style="padding:10px 12px; border:1px solid #ddd; border-radius:8px; width:140px;">
                     </label>
-                    <button id="applyFilterBtn" class="file-input-button" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">筛选区间</button>
-                    <button id="clearFilterBtn" class="file-input-button" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">清除筛选</button>
-                    <button id="resetBtn" class="file-input-button" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">🔄 恢复原始数据</button>
+                    <button id="applyFilterBtn" class="file-input-button" style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);">筛选区间</button>
+                    <button id="clearFilterBtn" class="file-input-button" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">清除筛选</button>
+                    <button id="resetBtn" class="file-input-button" style="background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);">🔄 恢复原始数据</button>
+                </div>
+                
+                <div style="display:inline-flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; margin-bottom: 15px;">
+                    <label>起始时间
+                        <input id="startDate" type="datetime-local" style="padding:10px 12px; border:1px solid #ddd; border-radius:8px; width:200px;">
+                    </label>
+                    <label>截止时间
+                        <input id="endDate" type="datetime-local" style="padding:10px 12px; border:1px solid #ddd; border-radius:8px; width:200px;">
+                    </label>
+                    <button id="applyDateFilterBtn" class="file-input-button" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);">应用时间筛选</button>
+                </div>
+                
+                <div style="display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center;">
+                    <button id="todayBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">今天</button>
+                    <button id="yesterdayBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">昨天</button>
+                    <button id="dayBeforeYesterdayBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">前天</button>
+                    <button id="twoDaysBeforeBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">大前天</button>
+                    <button id="lastHourBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">最近1小时</button>
+                    <button id="last3HoursBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">最近3小时</button>
+                    <button id="last3DaysBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">近3天</button>
+                    <button id="last5DaysBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">近5天</button>
+                    <button id="clearDateFilterBtn" class="file-input-button" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 8px 16px; font-size: 0.9em;">清除时间筛选</button>
+                    <button id="resetZoomBtn" class="file-input-button" style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); padding: 8px 16px; font-size: 0.9em;">🔍 重置缩放</button>
                 </div>
             </div>
             
@@ -210,6 +252,30 @@
     <script>
         let myChart = null;
         
+        // URL下载功能
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                showNotification('请输入有效的URL');
+                return;
+            }
+            
+            if (!url.endsWith('.txt')) {
+                showNotification('请确保URL指向.txt文件');
+                return;
+            }
+            
+            downloadAndProcessFile(url);
+        });
+        
+        // 支持回车键下载
+        document.getElementById('urlInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                document.getElementById('downloadBtn').click();
+            }
+        });
+        
+        // 文件选择功能
         document.getElementById('fileInput').addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (file) {
@@ -217,6 +283,168 @@
                 processFile(file);
             }
         });
+        
+        async function downloadAndProcessFile(url) {
+            const statusDiv = document.getElementById('downloadStatus');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            try {
+                statusDiv.textContent = '正在尝试直接下载...';
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = '下载中...';
+                
+                // 首先尝试直接下载
+                let response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const content = await response.text();
+                statusDiv.textContent = '文件下载成功，正在处理...';
+                
+                // 创建虚拟文件对象
+                const virtualFile = new File([content], 'downloaded_log.txt', { type: 'text/plain' });
+                processFile(virtualFile);
+                
+                statusDiv.textContent = `已成功从 ${url} 下载并加载数据`;
+                downloadBtn.textContent = '🌐 从URL下载';
+                downloadBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('直接下载失败:', error);
+                
+                // 尝试使用CORS代理
+                try {
+                    statusDiv.textContent = '直接下载失败，尝试使用CORS代理...';
+                    
+                    // 尝试多个CORS代理服务
+                    const proxyServices = [
+                        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                        `https://cors-anywhere.herokuapp.com/${url}`,
+                        `https://thingproxy.freeboard.io/fetch/${url}`
+                    ];
+                    
+                    let proxySuccess = false;
+                    for (const proxyUrl of proxyServices) {
+                        try {
+                            statusDiv.textContent = `尝试代理服务: ${proxyUrl.includes('allorigins') ? 'AllOrigins' : proxyUrl.includes('herokuapp') ? 'CORS Anywhere' : 'ThingProxy'}...`;
+                            
+                            const response = await fetch(proxyUrl, {
+                                headers: {
+                                    'Origin': window.location.origin
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const content = await response.text();
+                                statusDiv.textContent = '通过代理下载成功，正在处理...';
+                                
+                                const virtualFile = new File([content], 'downloaded_log.txt', { type: 'text/plain' });
+                                processFile(virtualFile);
+                                
+                                statusDiv.textContent = `已成功通过代理从 ${url} 下载并加载数据`;
+                                downloadBtn.textContent = '🌐 从URL下载';
+                                downloadBtn.disabled = false;
+                                
+                                proxySuccess = true;
+                                break;
+                            }
+                        } catch (proxyError) {
+                            console.log(`代理 ${proxyUrl} 失败:`, proxyError);
+                            continue;
+                        }
+                    }
+                    
+                    if (!proxySuccess) {
+                        throw new Error('所有代理服务都失败了');
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(`代理下载失败: HTTP ${response.status}`);
+                    }
+                    
+                    const content = await response.text();
+                    statusDiv.textContent = '通过代理下载成功，正在处理...';
+                    
+                    const virtualFile = new File([content], 'downloaded_log.txt', { type: 'text/plain' });
+                    processFile(virtualFile);
+                    
+                    statusDiv.textContent = `已成功通过代理从 ${url} 下载并加载数据`;
+                    downloadBtn.textContent = '🌐 从URL下载';
+                    downloadBtn.disabled = false;
+                    
+                } catch (proxyError) {
+                    console.error('代理下载也失败:', proxyError);
+                    
+                    // 显示详细的错误信息和解决方案
+                    const errorMessage = `下载失败: ${error.message}\n\n可能的原因和解决方案:\n1. CORS跨域限制 - 服务器不允许跨域访问\n2. 网络连接问题\n3. 文件不存在或权限不足\n\n建议:\n• 使用本地文件上传\n• 或手动复制文件内容到下方文本框`;
+                    
+                    statusDiv.innerHTML = `
+                        <div style="color: #e74c3c; background: #fdf2f2; padding: 10px; border-radius: 5px; border-left: 3px solid #e74c3c;">
+                            <strong>下载失败:</strong> ${error.message}<br>
+                            <small>由于浏览器安全限制，无法直接下载跨域文件</small>
+                        </div>
+                    `;
+                    
+                    downloadBtn.textContent = '🌐 从URL下载';
+                    downloadBtn.disabled = false;
+                    
+                    // 显示手动输入选项
+                    showManualInputOption();
+                }
+            }
+        }
+        
+        function showManualInputOption() {
+            const uploadSection = document.querySelector('.upload-section');
+            
+            // 检查是否已经存在手动输入区域
+            if (document.getElementById('manualInputArea')) {
+                return;
+            }
+            
+            const manualInputArea = document.createElement('div');
+            manualInputArea.id = 'manualInputArea';
+            manualInputArea.style.cssText = `
+                margin-top: 20px;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 8px;
+                border: 1px solid #dee2e6;
+            `;
+            
+            manualInputArea.innerHTML = `
+                <h4 style="margin: 0 0 15px 0; color: #495057;">📝 手动输入日志内容</h4>
+                <p style="margin: 0 0 15px 0; color: #6c757d; font-size: 14px;">
+                    如果URL下载失败，你可以手动复制粘贴日志内容到下方文本框：
+                </p>
+                <textarea id="manualLogInput" 
+                          placeholder="请将日志内容粘贴到这里，格式如：[2025-08-25 17:40:01] duration_ms=6483 uri=https://example.com is_200=true"
+                          style="width: 100%; height: 120px; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                <div style="margin-top: 10px; text-align: center;">
+                    <button id="processManualInputBtn" class="file-input-button" style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);">
+                        📊 处理手动输入
+                    </button>
+                </div>
+            `;
+            
+            uploadSection.appendChild(manualInputArea);
+            
+            // 添加手动输入处理事件
+            document.getElementById('processManualInputBtn').addEventListener('click', function() {
+                const content = document.getElementById('manualLogInput').value.trim();
+                if (!content) {
+                    showNotification('请输入日志内容');
+                    return;
+                }
+                
+                // 创建虚拟文件对象
+                const virtualFile = new File([content], 'manual_input_log.txt', { type: 'text/plain' });
+                processFile(virtualFile);
+                
+                showNotification('已成功处理手动输入的日志数据');
+            });
+        }
         
                 document.getElementById('resetBtn').addEventListener('click', function() {
             if (originalLogs.length > 0) {
@@ -261,6 +489,161 @@
             showNotification('已清除筛选');
         });
         
+        // 日期筛选功能
+        document.getElementById('applyDateFilterBtn').addEventListener('click', function() {
+            if (originalLogs.length === 0) return;
+            
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate && !endDate) {
+                showNotification('请至少选择一个起始或截止时间');
+                return;
+            }
+            
+            let filtered = [...originalLogs];
+            
+            if (startDate) {
+                const start = new Date(startDate);
+                filtered = filtered.filter(log => log.timestamp >= start);
+            }
+            
+            if (endDate) {
+                const end = new Date(endDate);
+                filtered = filtered.filter(log => log.timestamp <= end);
+            }
+            
+            if (filtered.length === 0) {
+                showNotification('所选时间范围内没有数据');
+                return;
+            }
+            
+            currentLogs = filtered;
+            displayChart(currentLogs);
+            displayStats(currentLogs);
+            showNotification(`已应用时间筛选，显示 ${filtered.length} 条数据`);
+        });
+        
+        // 快速时间筛选按钮
+        document.getElementById('todayBtn').addEventListener('click', function() {
+            setQuickDateFilter('today');
+        });
+        
+        document.getElementById('yesterdayBtn').addEventListener('click', function() {
+            setQuickDateFilter('yesterday');
+        });
+        
+        document.getElementById('dayBeforeYesterdayBtn').addEventListener('click', function() {
+            setQuickDateFilter('dayBeforeYesterday');
+        });
+        
+        document.getElementById('twoDaysBeforeBtn').addEventListener('click', function() {
+            setQuickDateFilter('twoDaysBefore');
+        });
+        
+        document.getElementById('lastHourBtn').addEventListener('click', function() {
+            setQuickDateFilter('lastHour');
+        });
+        
+        document.getElementById('last3HoursBtn').addEventListener('click', function() {
+            setQuickDateFilter('last3Hours');
+        });
+        
+        document.getElementById('last3DaysBtn').addEventListener('click', function() {
+            setQuickDateFilter('last3Days');
+        });
+        
+        document.getElementById('last5DaysBtn').addEventListener('click', function() {
+            setQuickDateFilter('last5Days');
+        });
+        
+        document.getElementById('clearDateFilterBtn').addEventListener('click', function() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            if (originalLogs.length > 0) {
+                currentLogs = [...originalLogs];
+                displayChart(currentLogs);
+                displayStats(currentLogs);
+                showNotification('已清除时间筛选');
+            }
+        });
+        
+        // 重置缩放功能
+        document.getElementById('resetZoomBtn').addEventListener('click', function() {
+            if (myChart) {
+                myChart.resetZoom();
+                showNotification('已重置缩放');
+            }
+        });
+        
+        function setQuickDateFilter(type) {
+            if (originalLogs.length === 0) return;
+            
+            const now = new Date();
+            let startDate, endDate;
+            let filterName = '';
+            
+            switch(type) {
+                case 'today':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                    filterName = '今天';
+                    break;
+                case 'yesterday':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+                    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    filterName = '昨天';
+                    break;
+                case 'dayBeforeYesterday':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+                    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+                    filterName = '前天';
+                    break;
+                case 'twoDaysBefore':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3);
+                    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+                    filterName = '大前天';
+                    break;
+                case 'lastHour':
+                    startDate = new Date(now.getTime() - 60 * 60 * 1000);
+                    endDate = now;
+                    filterName = '最近1小时';
+                    break;
+                case 'last3Hours':
+                    startDate = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+                    endDate = now;
+                    filterName = '最近3小时';
+                    break;
+                case 'last3Days':
+                    startDate = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+                    endDate = now;
+                    filterName = '近3天';
+                    break;
+                case 'last5Days':
+                    startDate = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+                    endDate = now;
+                    filterName = '近5天';
+                    break;
+            }
+            
+            // 设置输入框值
+            document.getElementById('startDate').value = startDate.toISOString().slice(0, 16);
+            document.getElementById('endDate').value = endDate.toISOString().slice(0, 16);
+            
+            // 应用筛选
+            let filtered = originalLogs.filter(log => log.timestamp >= startDate && log.timestamp <= endDate);
+            
+            if (filtered.length === 0) {
+                showNotification('所选时间范围内没有数据');
+                return;
+            }
+            
+            currentLogs = filtered;
+            displayChart(currentLogs);
+            displayStats(currentLogs);
+            showNotification(`已应用${filterName}筛选，显示 ${filtered.length} 条数据`);
+        }
+        
         function processFile(file) {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -273,6 +656,20 @@
                 }
                 
                 originalLogs = [...logs]; // 保存原始数据
+                
+                // 设置默认的日期时间范围
+                if (logs.length > 0) {
+                    const firstTime = logs[0].timestamp;
+                    const lastTime = logs[logs.length - 1].timestamp;
+                    
+                    // 设置起始时间为第一个日志时间的前1小时
+                    const startTime = new Date(firstTime.getTime() - 60 * 60 * 1000);
+                    document.getElementById('startDate').value = startTime.toISOString().slice(0, 16);
+                    
+                    // 设置结束时间为最后一个日志时间
+                    document.getElementById('endDate').value = lastTime.toISOString().slice(0, 16);
+                }
+                
                 displayChart(logs);
                 displayStats(logs);
                 document.getElementById('controls').style.display = 'block';
@@ -310,23 +707,18 @@
                 myChart.destroy();
             }
             
-            const labels = currentLogs.map(log => {
-                const date = log.timestamp;
-                return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
-            });
-            
             const durations = currentLogs.map(log => log.duration);
-            const colors = currentLogs.map(log => log.is200 ? '#4CAF50' : '#F44336');
+            const colors = currentLogs.map(log => log.is200 ? '#27ae60' : '#e74c3c');
             
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
+                    labels: currentLogs.map(log => log.timestamp),
                     datasets: [{
                         label: '请求耗时 (ms)',
                         data: durations,
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderColor: '#34495e',
+                        backgroundColor: 'rgba(52, 73, 94, 0.1)',
                         borderWidth: 3,
                         fill: true,
                         tension: 0.4,
@@ -348,7 +740,7 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: '请求耗时趋势图 (点击数据点可删除)',
+                            text: '请求耗时趋势图 (点击数据点可删除，支持缩放)',
                             font: {
                                 size: 18,
                                 weight: 'bold'
@@ -375,10 +767,43 @@
                         },
                         legend: {
                             display: false
+                        },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'xy',
+                                modifierKey: 'ctrl'
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                    speed: 0.1
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'xy',
+                                drag: {
+                                    enabled: true,
+                                    backgroundColor: 'rgba(225,225,225,0.3)',
+                                    borderColor: 'rgba(225,225,225)',
+                                    borderWidth: 1
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
+                            type: 'time',
+                            time: {
+                                unit: 'second', // 支持到秒级
+                                stepSize: 1,
+                                displayFormats: {
+                                    second: 'HH:mm:ss',
+                                    minute: 'HH:mm',
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
                             title: {
                                 display: true,
                                 text: '时间'
@@ -441,10 +866,10 @@
                 position: fixed;
                 top: 20px;
                 right: 20px;
-                background: #4CAF50;
+                background: #34495e;
                 color: white;
                 padding: 15px 20px;
-                border-radius: 8px;
+                border-radius: 6px;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.2);
                 z-index: 1000;
                 font-size: 14px;
