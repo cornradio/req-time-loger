@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Request Time Logger</title>
+<style>
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: #0b0e13;
+  color: #e6e9ef;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+.wrap {
+  max-width: 980px;
+  margin: 24px auto;
+  padding: 16px;
+}
+.topbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.title {
+  letter-spacing: .5px;
+  font-weight: 600;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+.panel {
+  background: #0f141c;
+  border: 1px solid #1b2432;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.05), 0 10px 30px rgba(0,0,0,.35) inset;
+}
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.controls { padding: 12px; border-bottom: 1px solid #1b2432; }
+label { font-size: 12px; color: #8b9bb0; }
+input[type="number"], input[type="text"], textarea {
+  background: #0b1017;
+  color: #e6e9ef;
+  border: 1px solid #1b2432;
+  border-radius: 8px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color .15s ease;
+}
+input[type="number"]:focus, textarea:focus { border-color: #10b981; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field.small { width: 140px; }
+.field.medium { width: 220px; }
+.code-area { padding: 12px; border-bottom: 1px solid #1b2432; }
+textarea#code {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.btns { padding: 12px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid #1b2432; }
+button {
+  appearance: none;
+  border: 1px solid #1b2432;
+  background: linear-gradient(180deg, #0e1520, #0a1018);
+  color: #e6e9ef;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform .06s ease, box-shadow .15s ease, border-color .2s ease;
+}
+button:hover { border-color: #10b981; box-shadow: 0 0 0 1px rgba(16,185,129,0.25) inset; }
+button:active { transform: translateY(1px); }
+button.secondary { border-color: #273244; color: #b8c2cf; }
+button.danger { border-color: #3a1f2b; color: #ffb3c1; }
+.button.primary { border-color: #10b981; box-shadow: 0 0 0 1px rgba(16,185,129,0.35) inset, 0 0 24px rgba(16,185,129,0.12); }
+.iconbtn { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #1b2432; background: linear-gradient(180deg, #0e1520, #0a1018); color: #e6e9ef; }
+.iconbtn:hover { border-color: #10b981; box-shadow: 0 0 0 1px rgba(16,185,129,0.25) inset; }
+.linkbtn { display:inline-block; text-decoration:none; border: 1px solid #1b2432; background: linear-gradient(180deg, #0e1520, #0a1018); color: #e6e9ef; padding: 9px 12px; border-radius: 8px; }
+.linkbtn:hover { border-color: #10b981; box-shadow: 0 0 0 1px rgba(16,185,129,0.25) inset; }
+.linkbtn.secondary { border-color: #273244; color: #b8c2cf; }
+.switch { display: inline-flex; gap: 8px; align-items: center; }
+.logs { padding: 12px; }
+textarea#logs { width: 100%; min-height: 220px; font-size: 12px; line-height: 1.5; }
+.hint { color: #8b9bb0; font-size: 12px; margin-top: 6px; }
+.accent { color: #10b981; }
+::selection { background: rgba(16,185,129,.35); }
+/* Scrollbar styling */
+textarea, .panel {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #2a3547 #0b1017; /* thumb track */
+}
+textarea::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+textarea::-webkit-scrollbar-track {
+  background: #0b1017;
+  border-radius: 8px;
+}
+textarea::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #223042, #1a2433);
+  border: 2px solid #0b1017;
+  border-radius: 8px;
+}
+textarea::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #275056, #21404a);
+}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <button id="startTop" class="iconbtn" title="开始发送" aria-label="开始发送">▶</button>
+    </div>
+    <div class="title">Req Time Logger <span class="accent">// minimal</span></div>
+
+    <div class="panel">
+      <div class="controls">
+        <div class="row">
+          <div class="field small">
+            <label for="count">发送次数</label>
+            <input id="count" type="number" min="1" value="1" />
+          </div>
+          <div class="field small">
+            <label for="interval">间隔(ms)</label>
+            <input id="interval" type="number" min="0" value="1000" />
+          </div>
+          <div class="field medium">
+            <label>模式</label>
+            <div class="switch">
+              <input id="continuous" type="checkbox" />
+              <label for="continuous">连续发送</label>
+            </div>
+          </div>
+          <div class="field medium">
+            <label>代理</label>
+            <div class="switch">
+              <input id="useProxy" type="checkbox" />
+              <label for="useProxy">通过代理发送</label>
+            </div>
+          </div>
+          <div class="field" style="flex:1">
+            <label class="hint">提示</label>
+            <div class="hint">在下方粘贴任意包含 <span class="accent">fetch(...)</span> 的 JS 代码</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-area">
+        <div class="row" style="margin-bottom:8px; align-items:center;">
+          <div class="field" style="flex:1; min-width: 260px;">
+            <label for="historySelect">历史代码</label>
+            <select id="historySelect" style="background:#0b1017; color:#e6e9ef; border:1px solid #1b2432; border-radius:8px; padding:10px 12px;">
+              <option value="">选择历史...</option>
+            </select>
+          </div>
+          <div class="field small" style="margin-top:18px;">
+            <button id="saveHistory" class="secondary">保存到历史</button>
+          </div>
+        </div>
+        <div id="proxyRow" class="row" style="margin-bottom:8px; align-items:flex-end; display:none;">
+          <div class="field" style="flex:1; min-width: 280px;">
+            <label for="proxyUrl">代理地址</label>
+            <input id="proxyUrl" type="text" placeholder="http://localhost:8787/proxy" value="http://localhost:8787/proxy" />
+          </div>
+        </div>
+        <textarea id="code" spellcheck="false" placeholder="// 示例：
+// 你可以自由写 fetch 代码；我们会自动计时与记录
+// 示例一：
+// await fetch('https://httpbin.org/get')
+// 示例二（带选项）：
+// await fetch('https://httpbin.org/status/200', { method: 'GET' })
+// 示例三（你也可以写函数并调用它）
+// async function go(){ await fetch('https://httpbin.org/delay/1'); }
+// await go();"></textarea>
+        <div class="hint">执行时会临时代理 <span class="accent">window.fetch</span>，自动输出日志。</div>
+      </div>
+
+      <div class="btns">
+        <button id="start" class="button primary">开始发送</button>
+        <button id="stop" class="secondary">停止</button>
+        <button id="export" class="secondary">导出日志</button>
+        <button id="copy" class="secondary">复制日志</button>
+        <button id="clear" class="danger">清空日志</button>
+        <div class="hint" id="status" style="margin-left:auto;">idle</div>
+      </div>
+
+      <div class="logs">
+        <div class="row" style="margin-bottom:8px; align-items:flex-end;">
+          <div class="field" style="flex:1; min-width: 240px;">
+            <label for="logFilter">日志筛选</label>
+            <input id="logFilter" type="text" placeholder="输入关键字进行筛选（不区分大小写）" />
+          </div>
+        </div>
+        <textarea id="logs" spellcheck="false" placeholder="[YYYY-MM-DD HH:MM:SS] duration_ms=123 uri=xxx.com is_200=true"></textarea>
+      </div>
+    </div>
+
+    <div class="hint" style="margin-top:10px;">
+      如果遇到浏览器 CORS 错误，可在本地调试时使用启动参数 <code>--disable-web-security</code>（注意风险，仅限本机临时测试）。
+      例如 macOS 启动 Chrome：
+      <code style="display:block;margin-top:6px;">open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/chrome-dev</code>
+    </div>
+
+    <div class="hint" style="margin-top:8px;">
+      cURL 转 Fetch 转换：
+      <a href="https://curlconverter.com/javascript/" target="_blank" rel="noopener noreferrer" class="accent">https://curlconverter.com/javascript/</a>
+    </div>
+
+  </div>
+
+<script>
+(function(){
+  const el = (id) => document.getElementById(id);
+  const $code = el('code');
+  const $logs = el('logs');
+  const $start = el('start');
+  const $startTop = el('startTop');
+  const $stop = el('stop');
+  const $copy = el('copy');
+  const $export = el('export');
+  const $clear = el('clear');
+  const $count = el('count');
+  const $interval = el('interval');
+  const $continuous = el('continuous');
+  const $status = el('status');
+  const $useProxy = el('useProxy');
+  const $proxyUrl = el('proxyUrl');
+  const $proxyRow = el('proxyRow');
+  const $historySelect = el('historySelect');
+  const $saveHistory = el('saveHistory');
+  const $logFilter = el('logFilter');
+
+  let isRunning = false;
+  let timerId = null;
+  let allLogLines = [];
+
+  function nowString(){
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    const MM = pad(d.getMonth()+1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mm = pad(d.getMinutes());
+    const ss = pad(d.getSeconds());
+    return `${yyyy}-${MM}-${dd} ${hh}:${mm}:${ss}`;
+  }
+
+  function appendLog(line){
+    allLogLines.push(line);
+    renderLogs();
+  }
+
+  function renderLogs(){
+    const q = ($logFilter && $logFilter.value || '').trim().toLowerCase();
+    const show = !q ? allLogLines : allLogLines.filter(l => l.toLowerCase().includes(q));
+    $logs.value = show.join('\n');
+    $logs.scrollTop = $logs.scrollHeight;
+  }
+
+  function getHostFromRequest(input){
+    try{
+      if (typeof input === 'string') return new URL(input, location.origin).host;
+      if (input && typeof input.url === 'string') return new URL(input.url, location.origin).host;
+    }catch(_){ /* ignore */ }
+    return 'unknown';
+  }
+
+  function createFetchProxy(){
+    const originalFetch = window.fetch.bind(window);
+    return async function proxyFetch(input, init){
+      const uriHost = getHostFromRequest(input);
+      const start = performance.now();
+      try{
+        let finalInit = init;
+        let res;
+        if ($useProxy && $useProxy.checked) {
+          const payload = await buildProxyPayload(input, finalInit);
+          const proxyEndpoint = ($proxyUrl && $proxyUrl.value) ? $proxyUrl.value : '';
+          res = await originalFetch(proxyEndpoint, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } else {
+          res = await originalFetch(input, finalInit);
+        }
+        const end = performance.now();
+        const duration = Math.round(end - start);
+        const is200 = res.status === 200;
+        appendLog(`[${nowString()}] duration_ms=${duration} uri=${uriHost} is_200=${is200}`);
+        return res;
+      }catch(err){
+        const end = performance.now();
+        const duration = Math.round(end - start);
+        appendLog(`[${nowString()}] duration_ms=${duration} uri=${uriHost} is_200=false`);
+        throw err;
+      }
+    };
+  }
+
+  async function buildProxyPayload(input, init){
+    // Normalize inputs
+    let url = '';
+    let method = 'GET';
+    let headersObj = {};
+    let bodyText = undefined;
+
+    // helper to normalize headers
+    const normalizeHeaders = (h) => {
+      const out = {};
+      if (!h) return out;
+      if (h instanceof Headers) { h.forEach((v,k)=>{ out[k] = v; }); return out; }
+      if (Array.isArray(h)) { h.forEach(([k,v])=>{ out[k] = v; }); return out; }
+      if (typeof h === 'object') { return { ...h }; }
+      return out;
+    };
+
+    if (typeof input === 'string') {
+      url = input;
+      if (init) {
+        method = (init.method || 'GET').toUpperCase();
+        headersObj = normalizeHeaders(init.headers);
+        if (init.body != null && method !== 'GET' && method !== 'HEAD') {
+          bodyText = typeof init.body === 'string' ? init.body : (init.body instanceof Blob ? await init.body.text() : String(init.body));
+        }
+      }
+    } else if (input && typeof input === 'object' && input.url) {
+      // Request object
+      url = input.url;
+      method = (input.method || 'GET').toUpperCase();
+      headersObj = normalizeHeaders(input.headers);
+      try {
+        if (method !== 'GET' && method !== 'HEAD') {
+          const cloned = input.clone();
+          bodyText = await cloned.text();
+        }
+      } catch(_) {}
+      if (init) {
+        // init overrides request fields
+        method = (init.method || method).toUpperCase();
+        headersObj = { ...headersObj, ...normalizeHeaders(init.headers) };
+        if (init.body != null && method !== 'GET' && method !== 'HEAD') {
+          bodyText = typeof init.body === 'string' ? init.body : (init.body instanceof Blob ? await init.body.text() : String(init.body));
+        }
+      }
+    }
+
+    return {
+      url,
+      method,
+      headers: headersObj,
+      body: bodyText,
+    };
+  }
+
+  async function runUserCodeOnce(){
+    const userCode = $code.value || '';
+    // Prepare sandboxed AsyncFunction with proxied fetch available
+    const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+    const proxiedFetch = createFetchProxy();
+    const fn = new AsyncFunction('fetch', 'window', 'document', `"use strict"; ${userCode}`);
+    // Execute with proxied fetch; expose window/document for convenience
+    await fn(proxiedFetch, undefined, undefined);
+  }
+
+  async function runCountTimesSequential(times, delayMs){
+    for (let i=0; i<times; i++){
+      if (!isRunning) break;
+      try{ await runUserCodeOnce(); }
+      catch(e){ /* surface error to logs as a separate line */ appendLog(`[${nowString()}] duration_ms=0 uri=unknown is_200=false`); }
+      if (delayMs > 0 && i < times - 1){
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+
+  function setUIRunning(running){
+    isRunning = running;
+    $start.disabled = running;
+    $stop.disabled = !running;
+    $status.textContent = running ? 'running' : 'idle';
+  }
+
+  async function start(){
+    if (isRunning) return;
+    setUIRunning(true);
+    const times = Math.max(1, Number($count.value || 1));
+    const gap = Math.max(0, Number($interval.value || 0));
+    const loop = !!$continuous.checked;
+
+    // save current code to history when starting
+    saveHistoryItem(($code.value || '').trim());
+
+    if (!loop){
+      await runCountTimesSequential(times, gap);
+      setUIRunning(false);
+      return;
+    }
+
+    // continuous mode
+    let stopping = false;
+    const loopOnce = async () => {
+      if (!isRunning || stopping) return;
+      await runCountTimesSequential(times, gap);
+      if (!isRunning || stopping) return;
+      timerId = setTimeout(loopOnce, gap);
+    };
+    loopOnce();
+  }
+
+  function stop(){
+    setUIRunning(false);
+    if (timerId){ clearTimeout(timerId); timerId = null; }
+  }
+
+  $start.addEventListener('click', () => { start(); });
+  $stop.addEventListener('click', () => { stop(); });
+  $startTop.addEventListener('click', () => { start(); });
+  $copy.addEventListener('click', async () => {
+    try{
+      await navigator.clipboard.writeText($logs.value);
+      $status.textContent = 'copied';
+      setTimeout(() => { if (!isRunning) $status.textContent = 'idle'; }, 800);
+    }catch(_){ /* ignore */ }
+  });
+  $clear.addEventListener('click', () => { $logs.value = ''; });
+  $export.addEventListener('click', () => {
+    try{
+      const blob = new Blob([$logs.value || ''], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'log.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }catch(_){ /* ignore */ }
+  });
+
+  // ============ History ============
+  const LS_KEY = 'rtl_code_history_v1';
+  function loadHistory(){
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr;
+    } catch(_){}
+    return [];
+  }
+  function persistHistory(list){
+    try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch(_){}
+  }
+  function summarize(code){
+    const first = (code.split('\n')[0] || '').trim();
+    const short = first.slice(0, 48).replace(/\s+/g,' ');
+    return short || 'snippet';
+  }
+  function renderHistory(){
+    const list = loadHistory();
+    // Reset
+    $historySelect.innerHTML = '<option value="">选择历史...</option>';
+    list
+      .sort((a,b)=> (b.ts||0)-(a.ts||0))
+      .forEach((item, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(item.id);
+        const dt = new Date(item.ts||Date.now());
+        const pad = (n)=> String(n).padStart(2,'0');
+        const ts = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+        opt.textContent = `${ts} · ${summarize(item.code)}`;
+        $historySelect.appendChild(opt);
+      });
+  }
+  function saveHistoryItem(code){
+    const trimmed = (code||'').trim();
+    if (!trimmed) return;
+    const list = loadHistory();
+    const existed = list.find(x => x.code === trimmed);
+    const ts = Date.now();
+    if (existed){
+      existed.ts = ts;
+    } else {
+      const id = ts + '-' + Math.random().toString(36).slice(2,7);
+      list.push({ id, code: trimmed, ts });
+      // keep at most 100
+      if (list.length > 100) list.shift();
+    }
+    persistHistory(list);
+    renderHistory();
+  }
+  $historySelect.addEventListener('change', () => {
+    const val = $historySelect.value;
+    if (!val) return;
+    const list = loadHistory();
+    const item = list.find(x => String(x.id) === String(val));
+    if (item){ $code.value = item.code; }
+  });
+  $saveHistory.addEventListener('click', () => {
+    saveHistoryItem(($code.value || '').trim());
+  });
+
+  // log filter
+  if ($logFilter){
+    $logFilter.addEventListener('input', () => { renderLogs(); });
+  }
+
+  // Default snippet for convenience
+  $code.value = `// 粘贴或编写包含fetch(...) 的代码。\n// 例如：\nawait fetch('https://httpbin.org/get');`;
+  renderHistory();
+
+  // toggle proxy row visibility
+  if ($useProxy){
+    $useProxy.addEventListener('change', () => {
+      if ($proxyRow) $proxyRow.style.display = $useProxy.checked ? '' : 'none';
+    });
+    // initialize
+    if ($proxyRow) $proxyRow.style.display = $useProxy.checked ? '' : 'none';
+  }
+
+})();
+</script>
+</body>
+</html>
+
